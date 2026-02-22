@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Générateur de QR Code Adaptatif</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Bibliothèque pour générer le QR Code -->
+    <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
+    <!-- Icônes -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+        }
+        /* Loader pour la redirection */
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3b82f6;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="text-slate-800 antialiased min-h-screen flex flex-col">
+
+    <!-- ECRAN DE REDIRECTION (Caché par défaut, s'affiche quand scanné) -->
+    <div id="redirect-screen" class="hidden flex-col items-center justify-center min-h-screen p-4 bg-white">
+        <div class="loader mb-6"></div>
+        <h1 class="text-2xl font-bold text-slate-800 mb-2 text-center">Redirection en cours...</h1>
+        <p class="text-slate-500 text-center max-w-sm">
+            Nous analysons votre appareil pour vous envoyer vers la bonne destination.
+        </p>
+    </div>
+
+    <!-- ECRAN DE L'APPLICATION (Générateur) -->
+    <div id="app-screen" class="flex-grow flex flex-col items-center py-10 px-4 hidden">
+        <div class="max-w-xl w-full">
+            
+            <div class="text-center mb-10">
+                <div class="inline-flex items-center justify-center p-3 bg-blue-100 rounded-full mb-4">
+                    <i data-lucide="qr-code" class="w-8 h-8 text-blue-600"></i>
+                </div>
+                <h1 class="text-3xl font-bold text-slate-900 mb-2">QR Code Adaptatif</h1>
+                <p class="text-slate-600">Créez un QR code intelligent qui redirige les iPhones vers l'App Store et les Androids vers le Play Store.</p>
+            </div>
+
+            <!-- Formulaire -->
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-8 mb-8">
+                
+                <!-- URL de base -->
+                <div class="mb-6">
+                    <label class="block text-sm font-semibold text-slate-700 mb-1">
+                        URL d'hébergement de ce routeur <span class="text-slate-400 font-normal">(Laissez par défaut ou mettez votre domaine)</span>
+                    </label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i data-lucide="globe" class="w-5 h-5 text-slate-400"></i>
+                        </div>
+                        <input type="url" id="baseUrlInput" class="block w-full pl-10 pr-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-colors" placeholder="https://monsite.com/qr.html">
+                    </div>
+                </div>
+
+                <hr class="border-slate-100 my-6">
+
+                <!-- Lien Apple -->
+                <div class="mb-5">
+                    <label class="block text-sm font-semibold text-slate-700 mb-1">
+                        Lien Apple (iOS) / Lien par défaut <span class="text-red-500">*</span>
+                    </label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i data-lucide="apple" class="w-5 h-5 text-slate-400"></i>
+                        </div>
+                        <input type="url" id="iosInput" class="block w-full pl-10 pr-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-colors" placeholder="ex: https://apps.apple.com/...">
+                    </div>
+                </div>
+
+                <!-- Lien Android -->
+                <div class="mb-6">
+                    <label class="block text-sm font-semibold text-slate-700 mb-1">
+                        Lien Android <span class="text-slate-400 font-normal">(Optionnel - utilise le lien Apple si vide)</span>
+                    </label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <i data-lucide="smartphone" class="w-5 h-5 text-slate-400"></i>
+                        </div>
+                        <input type="url" id="androidInput" class="block w-full pl-10 pr-3 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 text-sm transition-colors" placeholder="ex: https://play.google.com/...">
+                    </div>
+                </div>
+
+                <div id="error-msg" class="hidden text-red-500 text-sm mb-4 font-medium flex items-center gap-2">
+                    <i data-lucide="alert-circle" class="w-4 h-4"></i> Veuillez entrer au moins le lien Apple/Défaut.
+                </div>
+
+                <button id="generateBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm">
+                    <i data-lucide="zap" class="w-5 h-5"></i>
+                    Générer le QR Code
+                </button>
+            </div>
+
+            <!-- Résultat -->
+            <div id="result-section" class="hidden bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-8 flex flex-col items-center text-center animate-fade-in">
+                <h3 class="font-bold text-xl mb-6">Votre QR Code est prêt !</h3>
+                
+                <!-- Conteneur du QR Code avec un peu de design -->
+                <div class="p-4 bg-slate-50 rounded-2xl border border-slate-100 mb-6">
+                    <canvas id="qrcode-canvas" class="rounded-lg shadow-sm"></canvas>
+                </div>
+
+                <div class="w-full max-w-sm flex flex-col sm:flex-row gap-3">
+                    <button id="shareBtn" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white font-medium py-2.5 px-4 rounded-lg transition-colors flex items-center justify-center gap-2">
+                        <i data-lucide="share-2" class="w-4 h-4"></i>
+                        Partager
+                    </button>
+                    <button id="downloadBtn" class="flex-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 font-medium py-2.5 px-4 rounded-lg transition-colors flex items-center justify-center gap-2">
+                        <i data-lucide="download" class="w-4 h-4"></i>
+                        Télécharger
+                    </button>
+                </div>
+
+                <div class="w-full mt-6 text-left">
+                    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Lien généré (intégré dans le QR)</label>
+                    <div class="flex">
+                        <input type="text" id="generatedLink" readonly class="block w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-l-md text-xs text-slate-600 focus:outline-none">
+                        <button id="copyLinkBtn" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-3 py-2 rounded-r-md transition-colors flex items-center justify-center">
+                            <i data-lucide="copy" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Message de notification (Toast) -->
+    <div id="toast" class="fixed bottom-5 left-1/2 transform -translate-x-1/2 bg-slate-800 text-white px-4 py-2 rounded-lg shadow-lg text-sm font-medium transition-opacity duration-300 opacity-0 pointer-events-none flex items-center gap-2">
+        <i data-lucide="check-circle" class="w-4 h-4 text-green-400"></i>
+        <span id="toast-msg">Copié !</span>
+    </div>
+
+    <style>
+        .animate-fade-in {
+            animation: fadeIn 0.5s ease-out forwards;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+
+    <script>
+        // Initialiser les icônes Lucide
+        lucide.createIcons();
+
+        // 1. GESTION DE LA REDIRECTION OU DE L'AFFICHAGE DE L'APP
+        document.addEventListener('DOMContentLoaded', () => {
+            const params = new URLSearchParams(window.location.search);
+            const iosUrl = params.get('ios');
+            const androidUrl = params.get('and');
+
+            if (iosUrl) {
+                // MODE REDIRECTION : Le QR code a été scanné
+                document.getElementById('app-screen').classList.add('hidden');
+                document.getElementById('redirect-screen').classList.remove('hidden');
+                document.getElementById('redirect-screen').classList.add('flex');
+
+                // Détection de l'OS
+                const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+                let targetUrl = decodeURIComponent(iosUrl); // Par défaut (iOS, Desktop, etc.)
+
+                // Si c'est un Android, on redirige vers le lien Android s'il existe
+                if (/android/i.test(userAgent)) {
+                    if (androidUrl) {
+                        targetUrl = decodeURIComponent(androidUrl);
+                    }
+                }
+
+                // S'assurer que l'URL est absolue
+                if (!targetUrl.startsWith('http://') && !targetUrl.startsWith('https://')) {
+                    targetUrl = 'https://' + targetUrl;
+                }
+
+                // Redirection après un très court délai visuel
+                setTimeout(() => {
+                    window.location.href = targetUrl;
+                }, 1200);
+
+            } else {
+                // MODE APPLICATION : Aucune donnée dans l'URL, on affiche le générateur
+                document.getElementById('redirect-screen').classList.add('hidden');
+                document.getElementById('app-screen').classList.remove('hidden');
+                
+                // Préremplir l'URL de base avec l'URL actuelle (sans les paramètres)
+                const currentUrl = window.location.href.split('?')[0];
+                document.getElementById('baseUrlInput').value = currentUrl;
+            }
+        });
+
+        // 2. LOGIQUE DU GÉNÉRATEUR
+        const generateBtn = document.getElementById('generateBtn');
+        const iosInput = document.getElementById('iosInput');
+        const androidInput = document.getElementById('androidInput');
+        const baseUrlInput = document.getElementById('baseUrlInput');
+        const errorMsg = document.getElementById('error-msg');
+        const resultSection = document.getElementById('result-section');
+        const canvas = document.getElementById('qrcode-canvas');
+        const generatedLinkInput = document.getElementById('generatedLink');
+        const shareBtn = document.getElementById('shareBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const copyLinkBtn = document.getElementById('copyLinkBtn');
+
+        let currentGeneratedUrl = "";
+
+        generateBtn.addEventListener('click', () => {
+            const iosUrl = iosInput.value.trim();
+            const androidUrl = androidInput.value.trim();
+            let baseUrl = baseUrlInput.value.trim();
+
+            if (!iosUrl) {
+                errorMsg.classList.remove('hidden');
+                return;
+            }
+            errorMsg.classList.add('hidden');
+
+            if (!baseUrl) {
+                baseUrl = window.location.href.split('?')[0];
+            }
+
+            // Construction de l'URL adaptative
+            currentGeneratedUrl = `${baseUrl}?ios=${encodeURIComponent(iosUrl)}`;
+            if (androidUrl) {
+                currentGeneratedUrl += `&and=${encodeURIComponent(androidUrl)}`;
+            }
+
+            // Générer le QR Code sur le canvas
+            QRCode.toCanvas(canvas, currentGeneratedUrl, {
+                width: 250,
+                margin: 2,
+                color: {
+                    dark: '#0f172a', // slate-900
+                    light: '#ffffff'
+                }
+            }, function (error) {
+                if (error) console.error(error);
+                
+                // Afficher les résultats
+                generatedLinkInput.value = currentGeneratedUrl;
+                resultSection.classList.remove('hidden');
+                
+                // Scroll doucement vers le résultat
+                resultSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            });
+        });
+
+        // 3. FONCTIONS DE PARTAGE ET TÉLÉCHARGEMENT
+
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toast-msg').innerText = message;
+            toast.classList.remove('opacity-0');
+            setTimeout(() => {
+                toast.classList.add('opacity-0');
+            }, 3000);
+        }
+
+        // Partager (API Web Share)
+        shareBtn.addEventListener('click', async () => {
+            if (navigator.share) {
+                try {
+                    await navigator.share({
+                        title: 'Mon QR Code Adaptatif',
+                        text: 'Scannez ce QR code ou cliquez sur le lien pour accéder à l\'application !',
+                        url: currentGeneratedUrl
+                    });
+                } catch (err) {
+                    console.log('Partage annulé ou échoué', err);
+                }
+            } else {
+                // Fallback si l'API de partage n'est pas dispo (PC de bureau par ex)
+                copyToClipboard(currentGeneratedUrl);
+                showToast("Lien copié dans le presse-papier !");
+            }
+        });
+
+        // Télécharger l'image PNG
+        downloadBtn.addEventListener('click', () => {
+            const imageURI = canvas.toDataURL("image/png");
+            const link = document.createElement("a");
+            link.href = imageURI;
+            link.download = "QR_Code_Adaptatif.png";
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
+
+        // Copier le lien généré
+        function copyToClipboard(text) {
+            // Utilisation de l'API Clipboard ou du fallback document.execCommand
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(text);
+            } else {
+                const textArea = document.createElement("textarea");
+                textArea.value = text;
+                textArea.style.position = "fixed";
+                textArea.style.left = "-999999px";
+                textArea.style.top = "-999999px";
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                } catch (err) {
+                    console.error('Impossible de copier', err);
+                }
+                textArea.remove();
+            }
+        }
+
+        copyLinkBtn.addEventListener('click', () => {
+            copyToClipboard(currentGeneratedUrl);
+            showToast("Lien copié !");
+        });
+
+    </script>
+</body>
+</html>
+
